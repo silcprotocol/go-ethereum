@@ -366,11 +366,10 @@ func NewLightAPI(backend *lesCommons) *LightAPI {
 // LatestCheckpoint returns the latest local checkpoint package.
 //
 // The checkpoint package consists of 4 strings:
-//
-//	result[0], hex encoded latest section index
-//	result[1], 32 bytes hex encoded latest section head hash
-//	result[2], 32 bytes hex encoded latest section canonical hash trie root hash
-//	result[3], 32 bytes hex encoded latest section bloom trie root hash
+//   result[0], hex encoded latest section index
+//   result[1], 32 bytes hex encoded latest section head hash
+//   result[2], 32 bytes hex encoded latest section canonical hash trie root hash
+//   result[3], 32 bytes hex encoded latest section bloom trie root hash
 func (api *LightAPI) LatestCheckpoint() ([4]string, error) {
 	var res [4]string
 	cp := api.backend.latestLocalCheckpoint()
@@ -382,13 +381,12 @@ func (api *LightAPI) LatestCheckpoint() ([4]string, error) {
 	return res, nil
 }
 
-// GetCheckpoint returns the specific local checkpoint package.
+// GetLocalCheckpoint returns the specific local checkpoint package.
 //
 // The checkpoint package consists of 3 strings:
-//
-//	result[0], 32 bytes hex encoded latest section head hash
-//	result[1], 32 bytes hex encoded latest section canonical hash trie root hash
-//	result[2], 32 bytes hex encoded latest section bloom trie root hash
+//   result[0], 32 bytes hex encoded latest section head hash
+//   result[1], 32 bytes hex encoded latest section canonical hash trie root hash
+//   result[2], 32 bytes hex encoded latest section bloom trie root hash
 func (api *LightAPI) GetCheckpoint(index uint64) ([3]string, error) {
 	var res [3]string
 	cp := api.backend.localCheckpoint(index)

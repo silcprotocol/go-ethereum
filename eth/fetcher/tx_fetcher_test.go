@@ -25,7 +25,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
-	"github.com/ethereum/go-ethereum/core/txpool"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -869,9 +869,9 @@ func TestTransactionFetcherUnderpricedDedup(t *testing.T) {
 					errs := make([]error, len(txs))
 					for i := 0; i < len(errs); i++ {
 						if i%2 == 0 {
-							errs[i] = txpool.ErrUnderpriced
+							errs[i] = core.ErrUnderpriced
 						} else {
-							errs[i] = txpool.ErrReplaceUnderpriced
+							errs[i] = core.ErrReplaceUnderpriced
 						}
 					}
 					return errs
@@ -941,7 +941,7 @@ func TestTransactionFetcherUnderpricedDoSProtection(t *testing.T) {
 				func(txs []*types.Transaction) []error {
 					errs := make([]error, len(txs))
 					for i := 0; i < len(errs); i++ {
-						errs[i] = txpool.ErrUnderpriced
+						errs[i] = core.ErrUnderpriced
 					}
 					return errs
 				},

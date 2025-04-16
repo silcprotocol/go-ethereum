@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"io"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -70,7 +71,7 @@ func (l *JSONLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, sco
 		log.Memory = memory.Data()
 	}
 	if !l.cfg.DisableStack {
-		log.Stack = stack.Data
+		log.Stack = stack.Data()
 	}
 	if l.cfg.EnableReturnData {
 		log.ReturnData = rData
@@ -79,17 +80,18 @@ func (l *JSONLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, sco
 }
 
 // CaptureEnd is triggered at end of execution.
-func (l *JSONLogger) CaptureEnd(output []byte, gasUsed uint64, err error) {
+func (l *JSONLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
 	type endLog struct {
 		Output  string              `json:"output"`
 		GasUsed math.HexOrDecimal64 `json:"gasUsed"`
+		Time    time.Duration       `json:"time"`
 		Err     string              `json:"error,omitempty"`
 	}
 	var errMsg string
 	if err != nil {
 		errMsg = err.Error()
 	}
-	l.encoder.Encode(endLog{common.Bytes2Hex(output), math.HexOrDecimal64(gasUsed), errMsg})
+	l.encoder.Encode(endLog{common.Bytes2Hex(output), math.HexOrDecimal64(gasUsed), t, errMsg})
 }
 
 func (l *JSONLogger) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {

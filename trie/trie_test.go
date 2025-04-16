@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 )
@@ -63,8 +64,7 @@ func TestNull(t *testing.T) {
 }
 
 func TestMissingRoot(t *testing.T) {
-	root := common.HexToHash("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
-	trie, err := New(TrieID(root), NewDatabase(rawdb.NewMemoryDatabase()))
+	trie, err := New(common.Hash{}, common.HexToHash("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"), NewDatabase(memorydb.New()))
 	if trie != nil {
 		t.Error("New returned non-nil trie for invalid root")
 	}
@@ -77,7 +77,7 @@ func TestMissingNodeDisk(t *testing.T)    { testMissingNode(t, false) }
 func TestMissingNodeMemonly(t *testing.T) { testMissingNode(t, true) }
 
 func testMissingNode(t *testing.T, memonly bool) {
-	diskdb := rawdb.NewMemoryDatabase()
+	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
 
 	trie := NewEmpty(triedb)
@@ -89,27 +89,27 @@ func testMissingNode(t *testing.T, memonly bool) {
 		triedb.Commit(root, true, nil)
 	}
 
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	_, err := trie.TryGet([]byte("120000"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	_, err = trie.TryGet([]byte("120099"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	_, err = trie.TryGet([]byte("123456"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	err = trie.TryUpdate([]byte("120099"), []byte("zxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcv"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	err = trie.TryDelete([]byte("123456"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -122,27 +122,27 @@ func testMissingNode(t *testing.T, memonly bool) {
 		diskdb.Delete(hash[:])
 	}
 
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	_, err = trie.TryGet([]byte("120000"))
 	if _, ok := err.(*MissingNodeError); !ok {
 		t.Errorf("Wrong error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	_, err = trie.TryGet([]byte("120099"))
 	if _, ok := err.(*MissingNodeError); !ok {
 		t.Errorf("Wrong error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	_, err = trie.TryGet([]byte("123456"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	err = trie.TryUpdate([]byte("120099"), []byte("zxcv"))
 	if _, ok := err.(*MissingNodeError); !ok {
 		t.Errorf("Wrong error: %v", err)
 	}
-	trie, _ = New(TrieID(root), triedb)
+	trie, _ = New(common.Hash{}, root, triedb)
 	err = trie.TryDelete([]byte("123456"))
 	if _, ok := err.(*MissingNodeError); !ok {
 		t.Errorf("Wrong error: %v", err)
@@ -196,7 +196,7 @@ func TestGet(t *testing.T) {
 		}
 		root, nodes, _ := trie.Commit(false)
 		db.Update(NewWithNodeSet(nodes))
-		trie, _ = New(TrieID(root), db)
+		trie, _ = New(common.Hash{}, root, db)
 	}
 }
 
@@ -273,7 +273,7 @@ func TestReplication(t *testing.T) {
 	triedb.Update(NewWithNodeSet(nodes))
 
 	// create a new trie on top of the database and check that lookups work.
-	trie2, err := New(TrieID(exp), triedb)
+	trie2, err := New(common.Hash{}, exp, triedb)
 	if err != nil {
 		t.Fatalf("can't recreate trie at %x: %v", exp, err)
 	}
@@ -294,7 +294,7 @@ func TestReplication(t *testing.T) {
 	if nodes != nil {
 		triedb.Update(NewWithNodeSet(nodes))
 	}
-	trie2, err = New(TrieID(hash), triedb)
+	trie2, err = New(common.Hash{}, hash, triedb)
 	if err != nil {
 		t.Fatalf("can't recreate trie at %x: %v", exp, err)
 	}
@@ -377,7 +377,6 @@ const (
 	opCommit
 	opItercheckhash
 	opNodeDiff
-	opProve
 	opMax // boundary value, not an actual op
 )
 
@@ -403,7 +402,7 @@ func (randTest) Generate(r *rand.Rand, size int) reflect.Value {
 			step.key = genKey()
 			step.value = make([]byte, 8)
 			binary.BigEndian.PutUint64(step.value, uint64(i))
-		case opGet, opDelete, opProve:
+		case opGet, opDelete:
 			step.key = genKey()
 		}
 		steps = append(steps, step)
@@ -413,7 +412,7 @@ func (randTest) Generate(r *rand.Rand, size int) reflect.Value {
 
 func runRandTest(rt randTest) bool {
 	var (
-		triedb   = NewDatabase(rawdb.NewMemoryDatabase())
+		triedb   = NewDatabase(memorydb.New())
 		tr       = NewEmpty(triedb)
 		values   = make(map[string]string) // tracks content of the trie
 		origTrie = NewEmpty(triedb)
@@ -437,60 +436,24 @@ func runRandTest(rt randTest) bool {
 			if string(v) != want {
 				rt[i].err = fmt.Errorf("mismatch for key %#x, got %#x want %#x", step.key, v, want)
 			}
-		case opProve:
-			hash := tr.Hash()
-			if hash == emptyRoot {
-				continue
-			}
-			proofDb := rawdb.NewMemoryDatabase()
-			err := tr.Prove(step.key, 0, proofDb)
-			if err != nil {
-				rt[i].err = fmt.Errorf("failed for proving key %#x, %v", step.key, err)
-			}
-			_, err = VerifyProof(hash, step.key, proofDb)
-			if err != nil {
-				rt[i].err = fmt.Errorf("failed for verifying key %#x, %v", step.key, err)
-			}
 		case opHash:
 			tr.Hash()
 		case opCommit:
-			root, nodes, err := tr.Commit(true)
+			hash, nodes, err := tr.Commit(false)
 			if err != nil {
 				rt[i].err = err
 				return false
 			}
-			// Validity the returned nodeset
-			if nodes != nil {
-				for path, node := range nodes.updates.nodes {
-					blob, _, _ := origTrie.TryGetNode(hexToCompact([]byte(path)))
-					got := node.prev
-					if !bytes.Equal(blob, got) {
-						rt[i].err = fmt.Errorf("prevalue mismatch for 0x%x, got 0x%x want 0x%x", path, got, blob)
-						panic(rt[i].err)
-					}
-				}
-				for path, prev := range nodes.deletes {
-					blob, _, _ := origTrie.TryGetNode(hexToCompact([]byte(path)))
-					if !bytes.Equal(blob, prev) {
-						rt[i].err = fmt.Errorf("prevalue mismatch for 0x%x, got 0x%x want 0x%x", path, prev, blob)
-						return false
-					}
-				}
-			}
 			if nodes != nil {
 				triedb.Update(NewWithNodeSet(nodes))
 			}
-			newtr, err := New(TrieID(root), triedb)
+			newtr, err := New(common.Hash{}, hash, triedb)
 			if err != nil {
 				rt[i].err = err
 				return false
 			}
 			tr = newtr
-
-			// Enable node tracing. Resolve the root node again explicitly
-			// since it's not captured at the beginning.
 			tr.tracer = newTracer()
-			tr.resolveAndTrack(root.Bytes(), nil)
 
 			origTrie = tr.Copy()
 		case opItercheckhash:
@@ -608,7 +571,7 @@ func benchUpdate(b *testing.B, e binary.ByteOrder) *Trie {
 }
 
 // Benchmarks the trie hashing. Since the trie caches the result of any operation,
-// we cannot use b.N as the number of hashing rounds, since all rounds apart from
+// we cannot use b.N as the number of hashing rouns, since all rounds apart from
 // the first one will be NOOP. As such, we'll use b.N as the number of account to
 // insert into the trie before measuring the hashing.
 // BenchmarkHash-6   	  288680	      4561 ns/op	     682 B/op	       9 allocs/op
@@ -643,7 +606,7 @@ func BenchmarkHash(b *testing.B) {
 }
 
 // Benchmarks the trie Commit following a Hash. Since the trie caches the result of any operation,
-// we cannot use b.N as the number of hashing rounds, since all rounds apart from
+// we cannot use b.N as the number of hashing rouns, since all rounds apart from
 // the first one will be NOOP. As such, we'll use b.N as the number of account to
 // insert into the trie before measuring the hashing.
 func BenchmarkCommitAfterHash(b *testing.B) {
@@ -810,7 +773,7 @@ func TestCommitSequence(t *testing.T) {
 		addresses, accounts := makeAccounts(tc.count)
 		// This spongeDb is used to check the sequence of disk-db-writes
 		s := &spongeDb{sponge: sha3.NewLegacyKeccak256()}
-		db := NewDatabase(rawdb.NewDatabase(s))
+		db := NewDatabase(s)
 		trie := NewEmpty(db)
 		// Another sponge is used to check the callback-sequence
 		callbackSponge := sha3.NewLegacyKeccak256()
@@ -853,7 +816,7 @@ func TestCommitSequenceRandomBlobs(t *testing.T) {
 		prng := rand.New(rand.NewSource(int64(i)))
 		// This spongeDb is used to check the sequence of disk-db-writes
 		s := &spongeDb{sponge: sha3.NewLegacyKeccak256()}
-		db := NewDatabase(rawdb.NewDatabase(s))
+		db := NewDatabase(s)
 		trie := NewEmpty(db)
 		// Another sponge is used to check the callback-sequence
 		callbackSponge := sha3.NewLegacyKeccak256()
@@ -893,13 +856,11 @@ func TestCommitSequenceStackTrie(t *testing.T) {
 		prng := rand.New(rand.NewSource(int64(count)))
 		// This spongeDb is used to check the sequence of disk-db-writes
 		s := &spongeDb{sponge: sha3.NewLegacyKeccak256(), id: "a"}
-		db := NewDatabase(rawdb.NewDatabase(s))
+		db := NewDatabase(s)
 		trie := NewEmpty(db)
 		// Another sponge is used for the stacktrie commits
 		stackTrieSponge := &spongeDb{sponge: sha3.NewLegacyKeccak256(), id: "b"}
-		stTrie := NewStackTrie(func(owner common.Hash, path []byte, hash common.Hash, blob []byte) {
-			db.Scheme().WriteTrieNode(stackTrieSponge, owner, path, hash, blob)
-		})
+		stTrie := NewStackTrie(stackTrieSponge)
 		// Fill the trie with elements
 		for i := 0; i < count; i++ {
 			// For the stack trie, we need to do inserts in proper order
@@ -952,13 +913,11 @@ func TestCommitSequenceStackTrie(t *testing.T) {
 // not fit into 32 bytes, rlp-encoded. However, it's still the correct thing to do.
 func TestCommitSequenceSmallRoot(t *testing.T) {
 	s := &spongeDb{sponge: sha3.NewLegacyKeccak256(), id: "a"}
-	db := NewDatabase(rawdb.NewDatabase(s))
+	db := NewDatabase(s)
 	trie := NewEmpty(db)
 	// Another sponge is used for the stacktrie commits
 	stackTrieSponge := &spongeDb{sponge: sha3.NewLegacyKeccak256(), id: "b"}
-	stTrie := NewStackTrie(func(owner common.Hash, path []byte, hash common.Hash, blob []byte) {
-		db.Scheme().WriteTrieNode(stackTrieSponge, owner, path, hash, blob)
-	})
+	stTrie := NewStackTrie(stackTrieSponge)
 	// Add a single small-element to the trie(s)
 	key := make([]byte, 5)
 	key[0] = 1

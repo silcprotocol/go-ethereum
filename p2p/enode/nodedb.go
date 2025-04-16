@@ -494,7 +494,7 @@ func nextNode(it iterator.Iterator) *Node {
 	return nil
 }
 
-// Close flushes and closes the database files.
+// close flushes and closes the database files.
 func (db *DB) Close() {
 	close(db.quit)
 	db.lvl.Close()
